@@ -5,9 +5,10 @@
 
 #define MAX 100
 
-int tempCount = 1;
+int tempCounter = 1; // For naming temporary variables t1, t2, ...
 
-int prec(char op)
+// Function to return operator precedence
+int precedence(char op)
 {
     switch (op)
     {
@@ -20,131 +21,145 @@ int prec(char op)
     }
 }
 
-// Convert infix to postfix
-int infixToPostfix(char *exp, char postfix[][MAX])
+// Function to convert infix expression to postfix
+int infixToPostfix(char *expression, char postfix[][MAX])
 {
-    char stack[MAX];
-    int top = -1, k = 0;
+    char operatorStack[MAX];
+    int top = -1, postfixIndex = 0;
 
-    for (int i = 0; exp[i]; i++)
+    for (int i = 0; expression[i]; i++)
     {
-        char c = exp[i];
-        if (isspace(c))
+        char symbol = expression[i];
+
+        if (isspace(symbol))
             continue;
 
-        if (isalnum(c))
+        if (isalnum(symbol)) // Operand
         {
-            char t[2] = {c, '\0'};
-            strcpy(postfix[k++], t);
+            char token[2] = {symbol, '\0'};
+            strcpy(postfix[postfixIndex++], token);
         }
-        else if (c == '(')
-            stack[++top] = c;
-        else if (c == ')')
+        else if (symbol == '(')
         {
-            while (top != -1 && stack[top] != '(')
-            {
-                char t[2] = {stack[top--], '\0'};
-                strcpy(postfix[k++], t);
-            }
-            top--;
+            operatorStack[++top] = symbol;
         }
-        else if (strchr("+-*/^", c))
+        else if (symbol == ')')
         {
-            while (top != -1 && stack[top] != '(' && prec(stack[top]) >= prec(c))
+            while (top != -1 && operatorStack[top] != '(')
             {
-                char t[2] = {stack[top--], '\0'};
-                strcpy(postfix[k++], t);
+                char token[2] = {operatorStack[top--], '\0'};
+                strcpy(postfix[postfixIndex++], token);
             }
-            stack[++top] = c;
+            top--; // Pop '('
+        }
+        else if (strchr("+-*/^", symbol)) // Operator
+        {
+            while (top != -1 && operatorStack[top] != '(' && precedence(operatorStack[top]) >= precedence(symbol))
+            {
+                char token[2] = {operatorStack[top--], '\0'};
+                strcpy(postfix[postfixIndex++], token);
+            }
+            operatorStack[++top] = symbol;
         }
     }
 
+    // Pop remaining operators
     while (top != -1)
     {
-        char t[2] = {stack[top--], '\0'};
-        strcpy(postfix[k++], t);
+        char token[2] = {operatorStack[top--], '\0'};
+        strcpy(postfix[postfixIndex++], token);
     }
-    return k;
+
+    return postfixIndex;
 }
 
-// Generate Three Address Code + Triples + Quadruples
-void generateTAC(char postfix[][MAX], int n)
+// Function to generate Three Address Code (TAC), Triples, and Quadruples
+void generateIntermediateCode(char postfix[][MAX], int length)
 {
-    char stack[MAX][MAX], temp[10];
-    int top = -1;
+    char operandStack[MAX][MAX];  // Operand stack for TAC generation
+    int stackTop = -1;
 
     // Arrays for TAC
-    char opList[MAX], arg1[MAX][MAX], arg2[MAX][MAX], res[MAX][MAX];
+    char operatorList[MAX];
+    char operand1[MAX][MAX], operand2[MAX][MAX], result[MAX][MAX];
 
-    // Arrays for triples/quadruples (using (0), (1), etc.)
-    char tArg1[MAX][MAX], tArg2[MAX][MAX];
-    int instrCount = 0;
+    // Arrays for Triples/Quadruples (with references like (0), (1), etc.)
+    char tripleArg1[MAX][MAX], tripleArg2[MAX][MAX];
+    int instructionCount = 0;
 
-    printf("\nThree Address Code:\n");
+    printf("\n=== Three Address Code (TAC) ===\n");
 
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < length; i++)
     {
-        char c = postfix[i][0];
-        if (isalnum(c))
+        char symbol = postfix[i][0];
+
+        // Push operand to stack
+        if (isalnum(symbol))
         {
-            strcpy(stack[++top], postfix[i]);
+            strcpy(operandStack[++stackTop], postfix[i]);
         }
-        else if (strchr("+-*/^", c))
+        // Operator: pop two operands, generate a temp variable
+        else if (strchr("+-*/^", symbol))
         {
-            char op2[MAX], op1[MAX];
-            strcpy(op2, stack[top--]);
-            strcpy(op1, stack[top--]);
+            char rightOperand[MAX], leftOperand[MAX];
+            strcpy(rightOperand, operandStack[stackTop--]);
+            strcpy(leftOperand, operandStack[stackTop--]);
 
-            sprintf(temp, "t%d", tempCount++);
-            printf("%s = %s %c %s\n", temp, op1, c, op2);
+            char tempVar[10];
+            sprintf(tempVar, "t%d", tempCounter++);
 
-            // Store TAC
-            opList[instrCount] = c;
-            strcpy(arg1[instrCount], op1);
-            strcpy(arg2[instrCount], op2);
-            strcpy(res[instrCount], temp);
+            // Print TAC
+            printf("%s = %s %c %s\n", tempVar, leftOperand, symbol, rightOperand);
+
+            // Store for TAC arrays
+            operatorList[instructionCount] = symbol;
+            strcpy(operand1[instructionCount], leftOperand);
+            strcpy(operand2[instructionCount], rightOperand);
+            strcpy(result[instructionCount], tempVar);
 
             // For Triples/Quadruples, replace t# with (index)
-            // Example: if op1 = t1 → use (0)
-            if (op1[0] == 't')
-                sprintf(tArg1[instrCount], "(%d)", atoi(op1 + 1) - 1);
+            if (leftOperand[0] == 't')
+                sprintf(tripleArg1[instructionCount], "(%d)", atoi(leftOperand + 1) - 1);
             else
-                strcpy(tArg1[instrCount], op1);
+                strcpy(tripleArg1[instructionCount], leftOperand);
 
-            if (op2[0] == 't')
-                sprintf(tArg2[instrCount], "(%d)", atoi(op2 + 1) - 1);
+            if (rightOperand[0] == 't')
+                sprintf(tripleArg2[instructionCount], "(%d)", atoi(rightOperand + 1) - 1);
             else
-                strcpy(tArg2[instrCount], op2);
+                strcpy(tripleArg2[instructionCount], rightOperand);
 
-            strcpy(stack[++top], temp);
-            instrCount++;
+            // Push the new temp back to stack
+            strcpy(operandStack[++stackTop], tempVar);
+            instructionCount++;
         }
     }
 
-    // Print Triples
-    printf("\nTriples:\n");
+    // === Triples ===
+    printf("\n=== Triples ===\n");
     printf("Index\tOp\tArg1\tArg2\n");
-    for (int i = 0; i < instrCount; i++)
+    for (int i = 0; i < instructionCount; i++)
     {
-        printf("%d\t%c\t%s\t%s\n", i, opList[i], tArg1[i], tArg2[i]);
+        printf("%d\t%c\t%s\t%s\n", i, operatorList[i], tripleArg1[i], tripleArg2[i]);
     }
 
-    // Print Quadruples
-    printf("\nQuadruples:\n");
+    // === Quadruples ===
+    printf("\n=== Quadruples ===\n");
     printf("Index\tOp\tArg1\tArg2\tResult\n");
-    for (int i = 0; i < instrCount; i++)
+    for (int i = 0; i < instructionCount; i++)
     {
-        printf("%d\t%c\t%s\t%s\t%s\n", i, opList[i], tArg1[i], tArg2[i], res[i]);
+        printf("%d\t%c\t%s\t%s\t%s\n", i, operatorList[i], tripleArg1[i], tripleArg2[i], result[i]);
     }
 }
 
 int main()
 {
-    char expr[MAX], postfix[MAX][MAX];
-    printf("Enter expression (e.g., a+b*c^d): ");
-    scanf("%s", expr);
+    char expression[MAX], postfix[MAX][MAX];
 
-    int count = infixToPostfix(expr, postfix);
-    generateTAC(postfix, count);
+    printf("Enter arithmetic expression (e.g., a+b*c^d): ");
+    scanf("%s", expression);
+
+    int tokenCount = infixToPostfix(expression, postfix);
+    generateIntermediateCode(postfix, tokenCount);
+
     return 0;
 }
